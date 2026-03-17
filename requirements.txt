@@ -1,0 +1,11 @@
+fastapi
+uvicorn
+cadquery
+numpy
+networkx
+scikit-learn
+pandas
+opencv-python
+pymupdf
+ezdxf
+python-multipart
