@@ -1,0 +1,6 @@
+services:
+  - type: web
+    name: cnc-intelligence-engine-v16
+    env: docker
+    plan: free
+    autoDeploy: true
