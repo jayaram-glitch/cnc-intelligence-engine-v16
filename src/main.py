@@ -1,11 +1,14 @@
 from fastapi import FastAPI, UploadFile, File
 import shutil
 import os
+import warnings
 
-# FIXED IMPORTS
+# Suppress warnings (Point 8)
+warnings.filterwarnings("ignore")
+
+# Imports
 from src.cad.step_loader import load_step
 from src.cad.stl_loader import load_stl
-from src.cad.iges_loader import load_iges
 from src.cad.dxf_loader import load_dxf
 
 from src.afr.feature_patterns import detect_features
@@ -39,6 +42,7 @@ async def analyze_part(file: UploadFile = File(...)):
     try:
         file_path = os.path.join(UPLOAD_DIR, file.filename)
 
+        # Save file
         with open(file_path, "wb") as buffer:
             shutil.copyfileobj(file.file, buffer)
 
@@ -46,11 +50,9 @@ async def analyze_part(file: UploadFile = File(...)):
 
         shape = None
 
-        if ext in ["step", "stp"]:
+        # ✅ Point 6 — SAFE CAD LOADING
+        if ext in ["step", "stp", "iges", "igs"]:
             shape = load_step(file_path)
-
-        elif ext in ["iges", "igs"]:
-            shape = load_iges(file_path)
 
         elif ext == "stl":
             shape = load_stl(file_path)
@@ -59,22 +61,30 @@ async def analyze_part(file: UploadFile = File(...)):
             shape = load_dxf(file_path)
 
         else:
-            return {"error": "Unsupported file"}
+            return {"error": "Unsupported file type"}
 
+        # Feature detection
         features = detect_features(shape) if shape else {}
 
+        # CAM planning
         operations = plan_operations(features)
 
+        # Cycle time
         cycle_time = estimate_cycle_time(operations)
 
+        # DFM checks
         dfm = {
             "thin_wall": check_thin_wall(1.2),
             "tool_access": check_tool_access(40, 10),
             "deep_pocket": check_deep_pocket(20, 10)
         }
 
-        price = predict_price(sum(features.values()), len(operations))
+        # ✅ Point 7 — SAFE FEATURE COUNT
+        feature_count = sum(features.values()) if isinstance(features, dict) else 1
 
+        price = predict_price(feature_count, len(operations))
+
+        # Report
         report = generate_report(features, operations, price)
 
         return {
