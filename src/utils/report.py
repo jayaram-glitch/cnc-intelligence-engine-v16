@@ -1,7 +1,7 @@
-def generate_report(features, ops, price):
+def generate_report(features, operations, price):
 
     return {
-        "summary": features,
-        "operations": ops,
+        "features": features,
+        "operations": operations,
         "price": price
     }
