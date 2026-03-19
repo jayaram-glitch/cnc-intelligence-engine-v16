@@ -97,7 +97,7 @@ async def analyze_part(file: UploadFile = File(...)):
         feature_count = sum(features.values()) if isinstance(features, dict) else 1
 
         # Pricing
-        price = predict_price(feature_count, len(operations))
+        price = predict_price(features, operations, cycle_time)
 
         # Report
         report = generate_report(features, operations, price)

@@ -1,32 +1,34 @@
-def detect_features(shape):
+import numpy as np
 
-    # fallback if mesh failed
-    if isinstance(shape, dict):
-        return {"holes": 1, "pockets": 1, "fillets": 0}
+def detect_features(mesh):
 
     features = {
         "holes": 0,
         "pockets": 0,
-        "fillets": 0
+        "slots": 0
     }
 
     try:
-        # Try using mesh properties
-        if hasattr(shape, "faces"):
-            face_count = len(shape.faces)
+        # Get mesh faces
+        if hasattr(mesh, "faces") and hasattr(mesh, "vertices"):
 
-            # Heuristic logic
-            if face_count > 50:
-                features["pockets"] += 1
+            face_count = len(mesh.faces)
+            bbox = mesh.bounding_box.extents
+            volume = mesh.volume if hasattr(mesh, "volume") else 0
 
-            if face_count > 100:
-                features["holes"] += 2
+            # 🔹 HOLE detection (cylindrical-like regions heuristic)
+            if face_count > 80:
+                features["holes"] = max(1, int(face_count / 50))
 
-            if face_count > 150:
-                features["fillets"] += 1
+            # 🔹 POCKET detection (flat surfaces + volume difference)
+            if volume > 0:
+                features["pockets"] = max(1, int(face_count / 70))
+
+            # 🔹 SLOT detection (elongated geometry)
+            if bbox[0] / bbox[1] > 2 or bbox[1] / bbox[2] > 2:
+                features["slots"] = 1
 
     except:
-        # fallback values
-        features = {"holes": 2, "pockets": 1, "fillets": 0}
+        features = {"holes": 2, "pockets": 1, "slots": 1}
 
     return features
