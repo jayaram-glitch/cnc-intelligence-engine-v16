@@ -4,7 +4,7 @@ import fetch from "node-fetch";
 const app = express();
 app.use(express.json());
 
-const EC2_URL = "http://13.235.19.87:8000";
+const EC2_URL = "http://13.126.201.27:8000";
 
 app.get("/", (req, res) => {
   res.send("Proxy running");
