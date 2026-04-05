@@ -1,115 +1,40 @@
-from fastapi import FastAPI, UploadFile, File
-from fastapi.middleware.cors import CORSMiddleware
-import shutil
-import os
-import warnings
+from fastapi import FastAPI
+from pydantic import BaseModel
+import cadquery as cq
+import random
 
-# Suppress warnings
-warnings.filterwarnings("ignore")
+app = FastAPI()
 
-# CAD loaders
-from src.cad.step_loader import load_step
-from src.cad.stl_loader import load_stl
-from src.cad.dxf_loader import load_dxf
-
-# Feature detection
-from src.afr.feature_patterns import detect_features
-
-# DFM
-from src.dfm.thin_wall import check_thin_wall
-from src.dfm.tool_access import check_tool_access
-from src.dfm.deep_pocket import check_deep_pocket
-
-# Planner
-from src.planner.cam_planner import plan_operations
-from src.planner.cycle_time import estimate_cycle_time
-
-# Costing
-from src.costing.ai_pricing import predict_price
-
-# Report
-from src.utils.report import generate_report
-
-
-app = FastAPI(title="CNC Intelligence Engine")
-
-# ✅ CORS FIX (CRITICAL for Lovable)
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
-UPLOAD_DIR = "uploads"
-os.makedirs(UPLOAD_DIR, exist_ok=True)
-
+class PartInput(BaseModel):
+    length: float
+    width: float
+    height: float
+    holes: int = 0
 
 @app.get("/")
 def root():
-    return {"message": "CNC Intelligence Engine Running"}
+    return {"status": "CNC backend running"}
 
+@app.post("/analyze")
+def analyze_part(data: PartInput):
+    # Create part
+    part = cq.Workplane("XY").box(data.length, data.width, data.height)
 
-@app.post("/analyze-part")
-async def analyze_part(file: UploadFile = File(...)):
-    try:
-        file_path = os.path.join(UPLOAD_DIR, file.filename)
+    # Add holes (simple simulation)
+    for i in range(data.holes):
+        part = part.faces(">Z").workplane().hole(5)
 
-        # Save uploaded file
-        with open(file_path, "wb") as buffer:
-            shutil.copyfileobj(file.file, buffer)
+    # Feature extraction (basic)
+    volume = data.length * data.width * data.height
+    complexity = data.holes + 1
 
-        ext = file.filename.lower().split(".")[-1]
+    # AI pricing logic (basic version)
+    base_price = volume * 0.05
+    complexity_cost = complexity * 10
+    total_price = round(base_price + complexity_cost, 2)
 
-        shape = None
-
-        # ✅ SAFE CAD LOADING
-        if ext in ["step", "stp", "iges", "igs"]:
-            shape = load_step(file_path)
-
-        elif ext == "stl":
-            shape = load_stl(file_path)
-
-        elif ext == "dxf":
-            shape = load_dxf(file_path)
-
-        else:
-            return {"error": "Unsupported file type"}
-
-        # Feature detection
-        features = detect_features(shape) if shape else {}
-
-        # CAM planning
-        operations = plan_operations(features)
-
-        # Cycle time
-        cycle_time = estimate_cycle_time(operations)
-
-        # DFM checks
-        dfm = {
-            "thin_wall": check_thin_wall(1.2),
-            "tool_access": check_tool_access(40, 10),
-            "deep_pocket": check_deep_pocket(20, 10)
-        }
-
-        # ✅ SAFE FEATURE COUNT (prevents crash)
-        feature_count = sum(features.values()) if isinstance(features, dict) else 1
-
-        # Pricing
-        price = predict_price(features, operations, cycle_time)
-
-        # Report
-        report = generate_report(features, operations, price)
-
-        return {
-            "features": features,
-            "operations": operations,
-            "dfm": dfm,
-            "cycle_time": cycle_time,
-            "price": price,
-            "report": report
-        }
-
-    except Exception as e:
-        return {"error": str(e)}
+    return {
+        "volume": volume,
+        "complexity": complexity,
+        "estimated_price": total_price
+    }
